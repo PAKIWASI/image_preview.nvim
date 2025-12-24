@@ -1,20 +1,16 @@
 local M = {}
 
--- local function GetFileName(url)
---   return url:match("^.+/(.+)$")
--- end
 
 local function GetFileExtension(url)
     return url:match("^.+(%..+)$")
 end
 
-local function GetTerm()
+
+local function is_kitty()
     if os.getenv('KITTY_PID') ~= nil then
-        return 'kitty'
-    elseif os.getenv('WEZTERM_PANE') ~= nil then
-        return 'wezterm'
+        return true
     else
-        return nil
+        return false
     end
 end
 
@@ -35,51 +31,25 @@ function M.IsImage(url)
 end
 
 function M.PreviewImage(absolutePath)
-    local term = GetTerm()
 
     if M.IsImage(absolutePath) then
-        local command = ""
-
-        if term == 'wezterm' then
-            if vim.fn.has('win32') == 1 or vim.fn.has('win64') == 1 then
-                command = "silent !wezterm cli split-pane -- powershell wezterm imgcat "
-                    .. "'" .. absolutePath .. "'"
-                    .. " ; pause"
-            else
-                command = "silent !wezterm cli split-pane -- bash -c 'wezterm imgcat \"" .. absolutePath .. "\" ; read'"
-            end
-        elseif term == 'kitty' then
-            if vim.fn.has('win32') == 1 or vim.fn.has('win64') == 1 then
-                print('Kitty not supported on windows')
-            else
-                command = 'silent !kitten @ launch --type=window kitten icat --hold "' .. absolutePath .. '"'
-            end
-        else
-            print('No support for this terminal.')
-        end
-
-        vim.api.nvim_command(command)
+        -- TODO: check if correct
+        vim.api.nvim_cmd(
+            { cmd = "kitty +kitten icat", args = { absolutePath } },
+            { output = true }
+        )
     else
         print("No preview for file " .. absolutePath)
     end
 end
 
-function M.PreviewImageNvimTree()
-    local use, imported = pcall(require, "nvim-tree.lib")
-    if use then
-        local absolutePath = imported.get_node_at_cursor().absolute_path
-        M.PreviewImage(absolutePath)
-    else
-        return ''
-    end
-end
 
 function M.PreviewImageOil()
     local use, imported = pcall(require, "oil")
     if use then
         local entry = imported.get_cursor_entry()
 
-        if (entry['type'] == 'file') then
+        if (entry and entry['type'] == 'file') then
             local dir = imported.get_current_dir()
             local fileName = entry['name']
             local fullName = dir .. fileName
@@ -92,9 +62,6 @@ function M.PreviewImageOil()
 end
 
 function M.setup()
-    local command =
-    "au Filetype NvimTree nmap <buffer> <silent> <leader>p :lua require('image_preview').PreviewImageNvimTree()<cr>"
-    vim.api.nvim_command(command)
 
     local command =
     "au Filetype oil nmap <buffer> <silent> <leader>p :lua require('image_preview').PreviewImageOil()<cr>"
